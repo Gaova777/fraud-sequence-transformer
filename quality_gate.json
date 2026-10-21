@@ -1,0 +1,1 @@
+{"min_test_f1": {"lstm_random": 0.70, "transformer_random": 0.70}, "sequence_beats_xgboost": true}
