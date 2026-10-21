@@ -1,0 +1,14 @@
+__pycache__/
+.venv/
+.pytest_cache/
+.ruff_cache/
+data/raw/
+data/processed/
+data/models/
+data/logs/
+feature_repo/data/
+mlruns/
+mlflow.db
+web/node_modules/
+web/dist/
+.env

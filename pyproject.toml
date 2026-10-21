@@ -1,0 +1,30 @@
+[project]
+name = "fraud-sequence-transformer"
+version = "0.1.0"
+description = "Card fraud detection from customer histories (TabFormer reproduced) with cost-based thresholds, served with a feature store"
+readme = "README.md"
+authors = [
+    { name = "Juan Diego", email = "gaova777@utp.edu.co" }
+]
+requires-python = ">=3.12"
+dependencies = [
+    "numpy>=2.5.4",
+    "polars>=2.0.0",
+    "pyarrow>=26.0.0",
+    "scikit-learn>=1.9.1",
+    "xgboost>=3.4.1",
+]
+
+[build-system]
+requires = ["uv_build>=0.11.28,<0.12.0"]
+build-backend = "uv_build"
+
+[tool.ruff]
+line-length = 120
+
+[dependency-groups]
+dev = [
+    "httpx>=0.28.1",
+    "pytest>=9.1.1",
+    "ruff>=0.17.1",
+]
