@@ -29,7 +29,10 @@ def main(args):
     tr, va = rows_of(w["starts"][split == 0]), rows_of(w["starts"][split == 1])
     model = xgb.XGBClassifier(n_estimators=600, max_depth=8, learning_rate=0.1, subsample=0.8, colsample_bytree=0.8,
                               tree_method="hist", device=args.device, scale_pos_weight=(y[tr] == 0).sum() / max(1, y[tr].sum()),
-                              eval_metric="aucpr", early_stopping_rounds=40, n_jobs=16)
+                              eval_metric="aucpr", early_stopping_rounds=40 if args.trees is None else None,
+                              n_jobs=16)
+    if args.trees:
+        model.set_params(n_estimators=args.trees)
     model.fit(x[tr], y[tr], eval_set=[(x[va], y[va])], verbose=100)
 
     scores = np.zeros(len(df), dtype=np.float32)
@@ -43,12 +46,13 @@ def main(args):
     result = {"model": "xgboost", "split": args.split, "threshold": float(t),
               "val": f1_at(labels[val].tolist(), window_scores[val].tolist(), t),
               "test": f1_at(labels[test].tolist(), window_scores[test].tolist(), t),
-              "trees": int(model.best_iteration) + 1}
+              "trees": args.trees or int(model.best_iteration) + 1}
     Path("results/detection").mkdir(parents=True, exist_ok=True)
-    Path(f"results/detection/xgboost_{args.split}.json").write_text(json.dumps(result, indent=1) + "\n")
+    tag = f"xgboost_{args.split}" + (f"_{args.trees}trees" if args.trees else "")
+    Path(f"results/detection/{tag}.json").write_text(json.dumps(result, indent=1) + "\n")
     Path("data/models").mkdir(parents=True, exist_ok=True)
-    model.save_model(f"data/models/xgboost_{args.split}.json")
-    np.save(f"data/models/scores_xgboost_{args.split}.npy", window_scores)
+    model.save_model(f"data/models/{tag}.json")
+    np.save(f"data/models/scores_{tag}.npy", window_scores)
     print(json.dumps({k: result[k] for k in ("threshold", "test")}, indent=1))
 
 
@@ -56,4 +60,5 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--split", choices=["random", "chrono"], default="random")
     parser.add_argument("--device", default="cpu")
+    parser.add_argument("--trees", type=int, default=None, help="a fixed number of trees instead of early stopping")
     main(parser.parse_args())
