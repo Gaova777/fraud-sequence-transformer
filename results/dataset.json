@@ -1,0 +1,35 @@
+{
+ "transactions": 24386900,
+ "users": 2000,
+ "fraud_transactions": 29757,
+ "windows": 2437789,
+ "fraud_windows": 11492,
+ "random": {
+  "train": {
+   "windows": 1462617,
+   "fraud": 6838
+  },
+  "val": {
+   "windows": 487547,
+   "fraud": 2313
+  },
+  "test": {
+   "windows": 487625,
+   "fraud": 2341
+  }
+ },
+ "chrono": {
+  "train": {
+   "windows": 1716551,
+   "fraud": 7418
+  },
+  "val": {
+   "windows": 343209,
+   "fraud": 1728
+  },
+  "test": {
+   "windows": 378029,
+   "fraud": 2346
+  }
+ }
+}
