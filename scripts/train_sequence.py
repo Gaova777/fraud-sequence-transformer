@@ -21,13 +21,17 @@ from fraud_sequence_transformer.domain.metrics import best_f1_threshold, f1_at
 SIZE = 10
 
 
+def gather(table, starts, device):
+    """The ten token rows of each window, gathered in RAM and sent to the GPU one batch at a time: the 24M-row table
+    stays out of GPU memory, which another training may be using."""
+    return torch.as_tensor(table[starts[:, None] + np.arange(SIZE)], device=device)
+
+
 @torch.no_grad()
-def score(model, table, starts, offsets, batch=8192):
+def score(model, table, starts, device, batch=8192):
     model.eval()
-    out = []
-    for i in range(0, len(starts), batch):
-        idx = torch.as_tensor(starts[i:i + batch], device=table.device)[:, None] + offsets
-        out.append(torch.sigmoid(model(table[idx])).float().cpu())
+    out = [torch.sigmoid(model(gather(table, starts[i:i + batch], device))).float().cpu()
+           for i in range(0, len(starts), batch)]
     return torch.cat(out).numpy()
 
 
@@ -36,10 +40,9 @@ def main(args):
     device = "cuda" if torch.cuda.is_available() else "cpu"
     tokens = pl.read_parquet("data/processed/transactions.parquet", columns=FIELDS).to_numpy().astype(np.int64)
     vocab = [int(tokens[:, i].max()) for i in range(tokens.shape[1])]
-    table = torch.as_tensor(tokens, device=device)
+    table = tokens
     w = np.load("data/processed/windows.npz")
     split, labels, starts = w[f"split_{args.split}"], w["labels"], w["starts"]
-    offsets = torch.arange(SIZE, device=device)
     train = np.flatnonzero(split == 0)
     pos, neg = train[labels[train] == 1], train[labels[train] == 0]
     model = MODELS[args.model](vocab).to(device)
@@ -53,9 +56,8 @@ def main(args):
         rng.shuffle(idx)
         for i in range(0, len(idx), args.batch):
             b = idx[i:i + args.batch]
-            rows = torch.as_tensor(starts[b], device=device)[:, None] + offsets
             y = torch.as_tensor(labels[b], device=device, dtype=torch.float32)
-            loss = F.binary_cross_entropy_with_logits(model(table[rows]), y)
+            loss = F.binary_cross_entropy_with_logits(model(gather(table, starts[b], device)), y)
             opt.zero_grad()
             loss.backward()
             opt.step()
@@ -63,8 +65,8 @@ def main(args):
 
     val, test = np.flatnonzero(split == 1), np.flatnonzero(split == 2)
     scores = np.zeros(len(starts), dtype=np.float32)
-    scores[val] = score(model, table, starts[val], offsets)
-    scores[test] = score(model, table, starts[test], offsets)
+    scores[val] = score(model, table, starts[val], device)
+    scores[test] = score(model, table, starts[test], device)
     grid = np.unique(np.quantile(scores[val], np.linspace(0.9, 0.99999, 300)))
     t = best_f1_threshold(labels[val].tolist(), scores[val].tolist(), grid.tolist())
     result = {"model": args.model, "split": args.split, "threshold": float(t), "epochs": args.epochs,
